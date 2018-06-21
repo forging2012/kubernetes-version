@@ -47,6 +47,10 @@ fversion=`curl -s 'https://api.github.com/repos/coreos/flannel/tags?page=1&per_p
 echo quay.io/coreos/flannel:${fversion}-amd64 >> ./k8s-components-version.txt
 
 #Get coredns version
-if version_gt $1 v1.8; then
+if version_lt $1 v1.9; then
+  :
+else
   curl -s -L https://github.com/kubernetes/kubernetes/raw/$1/cluster/addons/dns/coredns.yaml.base |grep -v imagePullPolicy |grep image |awk '{print $2$3}' >> ./k8s-components-version.txt
 fi
+
+cat ./k8s-components-version.txt
