@@ -10,6 +10,7 @@ echo gcr.io/google_containers/pause-amd64:$pversion >> ./k8s-components-version.
 
 #Get kubernetes version
 function version_gt() { test "$(echo "$@" | tr " " "\n" | sort -V | head -n 1)" != "$1"; }
+function version_lt() { test "$(echo "$@" | tr " " "\n" | sort -V -r | head -n 1)" != "$1"; }
 
 if version_gt $1 v1.9.6; then
   echo k8s.gcr.io/kube-apiserver-amd64:$1 >> ./k8s-components-version.txt
@@ -24,19 +25,18 @@ else
 fi
 
 #Get kube-dns version
-#For version uper than 1.8.x
-kversion=`curl -s -L https://github.com/kubernetes/kubernetes/raw/$1/cluster/addons/dns/kube-dns.yaml.base |grep image |awk '{print $2$3}'`
-if [ -z "$kversion" ]; then
-  #For version uper than 1.5.x
-  kversion=`curl -s -L https://github.com/kubernetes/kubernetes/raw/$1/cluster/addons/dns/kubedns-controller.yaml.base |grep image |awk '{print $2$3}'`
-  if [ -z "$kversion" ]; then
-    #For version lower than 1.6.x
-    curl -s -L https://github.com/kubernetes/kubernetes/raw/$1/cluster/addons/dns/skydns-rc.yaml.base |grep 'image: gcr.io' |awk '{print $2$3}' >> ./k8s-components-version.txt
-  else
-    curl -s -L https://github.com/kubernetes/kubernetes/raw/$1/cluster/addons/dns/kubedns-controller.yaml.base |grep image |awk '{print $2$3}' >> ./k8s-components-version.txt
-  fi
+if version_lt $1 v1.6; then
+  kversion=`curl -s -L https://github.com/kubernetes/kubernetes/raw/$1/cluster/addons/dns/skydns-rc.yaml.base |grep image |awk '{print $2$3}'`
 else
-  curl -s -L https://github.com/kubernetes/kubernetes/raw/$1/cluster/addons/dns/kube-dns.yaml.base |grep image |awk '{print $2$3}' >> ./k8s-components-version.txt
+  if version_lt $1 v1.9; then
+    kversion=`curl -s -L https://github.com/kubernetes/kubernetes/raw/$1/cluster/addons/dns/kubedns-controller.yaml.base |grep image |awk '{print $2$3}'`
+  else
+    kversion=`curl -s -L https://github.com/kubernetes/kubernetes/raw/$1/cluster/addons/dns/kube-dns.yaml.base |grep image |awk '{print $2$3}'`
+  fi
+fi
+
+if [ -n "$kversion" ]; then
+  echo $kversion | tr " " "\n" >> ./k8s-components-version.txt
 fi
 
 #Get dashboard version
@@ -47,4 +47,6 @@ fversion=`curl -s 'https://api.github.com/repos/coreos/flannel/tags?page=1&per_p
 echo quay.io/coreos/flannel:${fversion}-amd64 >> ./k8s-components-version.txt
 
 #Get coredns version
-curl -s -L https://github.com/kubernetes/kubernetes/raw/$1/cluster/addons/dns/coredns.yaml.base |grep -v imagePullPolicy |grep image |awk '{print $2$3}' >> ./k8s-components-version.txt
+if version_gt $1 v1.8; then
+  curl -s -L https://github.com/kubernetes/kubernetes/raw/$1/cluster/addons/dns/coredns.yaml.base |grep -v imagePullPolicy |grep image |awk '{print $2$3}' >> ./k8s-components-version.txt
+fi
